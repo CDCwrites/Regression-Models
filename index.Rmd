@@ -1,0 +1,126 @@
+---
+output:
+  pdf_document:
+    keep_tex: yes
+  html_document: default
+---
+---
+title: "RM Class Project"
+author: "Cynthia Davies Cunha"
+date: "Tuesday, November 18, 2014"
+output: html_document
+--- 
+## Introduction
+This report, generated for Johns Hopkins Regression Models class, presupposes that I "work for Motor Trend, a magazine about the automobile industry" and considers "a data set of a collection of cars" to discern "the relationship between a set of variables and miles per gallon."  Of special interest is the answer to the following question:
+<b><i>Is there a difference in miles per gallon between automatic and manual transmissions?  If so, what is it? </i></b>
+ 
+## Executive Summary
+There are 32 obs of 11 categorical, numerica variables in the mtcars dataset.  Our prospective linear model uses miles per gallon (mpg) as the outcome and transmission type (am; automatic vs manual) as one independent variable.
+
+Backwards Selection with F-tests and the Akaike Information Criterion (AIC) with forward and backward selection yield the model:
+<b>lm(mpg ~ wt + qsec + am)</b>  The significance level is at least 0.05.
+
+An initial diagnostic check for outliers, using 10 confounder variables and mpg as outcome, shows none. Ploting the above model, with transmission (am; automatic=0, manual=1) as a factor, indicates that the highest mpg for a manual car approaches 35 mpg; for an automatic, 25.  There is no overfitting of the data with this model. That agrees with the interpretation of residual degrees of freedom values from the AIC generated model.  Underfitting may be an issue.  A model comparison using weighted wt (squared, cubed, etc) and ANOVA shows that squaring the wt variable may not be an improvement (very weak evidence for it); only the squared wt model comparison showed a significant p-value so only the model is considered.  A plot of residuals and the final model confounders shows that wt residuals are uniform about the x-axis, and qsec is fairly uniform, suggesting that a linear model is appropriate.
+
+Variance trade-off, a reduction in both variance and bias (a mapping to observed data) does not generally occur. Small models, like the one above, generally have more bias. (Linear regression estimates are unbiased when the model is correct.)  However, bias is not seen with this model.
+
+```{r, results='asis', echo=FALSE}
+library(stats)
+library(MASS)
+```
+### Explore the Data Set (mtcars).  
+```{r, results='markup'}
+data(mtcars)
+str(mtcars)
+# As expected an increase in wt, hp or a change in carbureator may lead
+# to fewer miles-per-gallon; a change in transmission could lead to higher
+summary(fit0 <- lm(mpg ~ . -1, mtcars))$coef
+# Regression Diagnostics: check influence -> no outliers; Lincoln Continental (max hat)
+max(influence(fit0)$hat)
+
+# explore effect of am factor variable; positive coefficients and low 
+# p-values indicate that transmission type may have a large mpg influence 
+fit1 <- lm(mpg ~ factor(am) -1, mtcars)
+summary(fit1)$coef
+
+rm(fit0, fit1)
+```
+## Appendix
+### Comparing Models: Backwards Variable Selection using F-tests
+The result is the linear model: lm(mpg ~ wt + qsec + am) where wt and qsec
+have a probability significance of 0.001 and am has a significance of 0.05
+```{r, results='hide', echo=FALSE}
+# cyl has the highest p-val (0.91609), so remove it
+fit1 <- lm(mpg ~ disp + hp + drat + wt + qsec + vs + am + gear + carb, mtcars)
+drop1(fit1, test="F")
+
+# vs has the highest p-val (0.84326), so remove it
+fit2 <- lm(mpg ~ disp + hp + drat + wt + qsec + am + gear + carb, mtcars)
+drop1(fit2, test="F")
+
+# carb has the highest p-val (0.74696), so remove it
+fit3 <- lm(mpg ~ disp + hp + drat + wt + qsec + am + gear, mtcars)
+drop1(fit3, test="F")
+
+# gear has the highest p-val (0.619641), so remove it
+fit4 <- lm(mpg ~ disp + hp + drat + wt + qsec + am, mtcars)
+drop1(fit4, test="F")
+
+# drat has the highest p-val (0.462401), so remove it
+fit5 <- lm(mpg ~ disp + hp + wt + qsec + am, mtcars)
+drop1(fit5, test="F")
+
+# disp has the highest p-val (0.298971), so remove it
+fit6 <- lm(mpg ~ hp + wt + qsec + am, mtcars)
+drop1(fit6, test="F")
+```
+Here is the result from our final regression using F-tests; wt, qsec and am are significant:
+```{r, results='markup', echo=FALSE}
+# hp has the highest p-val (0.223088), so remove it
+fit7 <- lm(mpg ~ wt + qsec + am, mtcars)
+drop1(fit7, test="F")
+rm(fit1, fit2, fit3, fit4, fit5, fit6)
+```
+### Akaike Information Criterion (AIC) generated model
+Using both Forwards and Backwards Selection, the result from AIC is the linear model:   lm(mpg ~ wt + qsec + am) 
+```{r, results='markup', echo=FALSE}
+# start with linear model with all variables
+fit <- lm(mpg ~ cyl + disp + hp + drat + wt + qsec + vs + am + gear + carb, mtcars)
+lmAIC <- stepAIC( fit, direction="both", trace=FALSE)
+# analysis of variation of model predicted by AIC
+lmAIC$anova
+```
+### Consider other linear combinations using wt variable
+```{r, echo=FALSE}
+out1 <- lm(mpg ~ wt + qsec + factor(am), data=mtcars)
+out2 <- update(out1, . ~ . + I(wt^2))
+out3 <- update(out2, . ~ . + I(wt^3))
+out4 <- update(out3, . ~ . + I(wt^4))
+out5 <- update(out4, . ~ . + I(wt^5))
+out6 <- update(out5, . ~ . + I(wt^6))
+out7 <- update(out6, . ~ . + I(wt^7))
+anova(out1, out2, out3, out4, out5, out6, out7)
+```
+### Plot the linear model: lm(mpg ~ wt + qsec + factor(am))
+We see an increase in mpg for manual transmissions, using confounders wt  + qsec, and using am as a factor.
+```{r, echo=FALSE, results='asis', echo=FALSE}
+require(graphics)
+coplot(mpg ~ wt + qsec | as.factor(am), data=mtcars, panel = panel.smooth, rows = 1)
+``` 
+
+### Interpret the fit of the model
+```{r, results='markup', echo=FALSE}
+layout(matrix(c(1,2), 1, 2))
+# plot residuals of weight; are points randomly dispersed around x-axis?
+fit10 <- lm(mpg ~ wt, data=mtcars) 
+res10 <- resid(fit10)
+# Plot the residual against the observed values of the variable wt
+plot(mtcars$wt, res10, ylab="Residuals", xlab="Weight") 
+abline(0, 0)                 
+
+# plot residuals of qsec; are pts randownly dispersed around x-axis?
+fit11 <- lm(mpg ~ qsec, data=mtcars)
+res11 <- resid(fit11)
+plot(mtcars$qsec, res11, ylab="Residuals", xlab="qsec")
+abline(0,0)
+```
